@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Indic Voice Lab | Universal App</title>
+    <title>Indic Voice Lab | Vercel Ready</title>
+    
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --pure-black: #000000; --glass: rgba(255, 255, 255, 0.25); }
@@ -15,28 +17,34 @@
             background-size: cover; background-attachment: fixed; background-position: center top;
             color: var(--pure-black); font-family: 'Rajdhani', sans-serif;
         }
-        .section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; padding: 20px; box-sizing: border-box; }
-        .glass-panel { background: var(--glass); backdrop-filter: blur(25px); border: 3px solid var(--pure-black); border-radius: 24px; padding: 30px; width: 100%; max-width: 450px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); text-align: center; }
-        h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; text-transform: uppercase; margin: 0 0 20px 0; }
-        textarea { width: 100%; height: 100px; background: rgba(255,255,255,0.15); border: 2px solid var(--pure-black); border-radius: 12px; padding: 15px; font-weight: 700; font-size: 1.1rem; box-sizing: border-box; }
-        select, .btn-main { width: 100%; margin: 10px 0; padding: 15px; border: 2px solid var(--pure-black); border-radius: 12px; font-weight: 900; font-family: 'Orbitron'; cursor: pointer; }
-        .btn-main { background: var(--pure-black); color: white; text-transform: uppercase; }
-        .mic-btn { width: 70px; height: 70px; border-radius: 50%; border: 3px solid var(--pure-black); background: white; font-size: 1.8rem; cursor: pointer; margin: 10px 0; display: inline-flex; align-items: center; justify-content: center; }
+        .section { min-height: 100vh; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; padding: 40px 0; box-sizing: border-box; }
+        .glass-panel { background: var(--glass); backdrop-filter: blur(25px); border: 3px solid var(--pure-black); border-radius: 24px; padding: 40px; width: 90%; max-width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); text-align: center; }
+        h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; text-transform: uppercase; margin-top: 0; letter-spacing: 2px; }
+        textarea { width: 100%; height: 120px; background: rgba(255,255,255,0.15); border: 2px solid var(--pure-black); border-radius: 12px; padding: 15px; font-weight: 700; font-size: 1.1rem; box-sizing: border-box; color: black; resize: none; }
+        select, .btn-main { width: 100%; margin: 15px 0; padding: 15px; border: 2px solid var(--pure-black); border-radius: 12px; font-weight: 900; font-family: 'Orbitron'; cursor: pointer; }
+        .btn-main { background: var(--pure-black); color: white; text-transform: uppercase; letter-spacing: 1.5px; transition: 0.3s; }
+        .btn-main:hover { background: transparent; color: var(--pure-black); }
+        .mic-btn { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--pure-black); background: white; font-size: 2rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin: 10px 0; }
         .mic-btn.active { background: #ff3b3b; color: white; animation: pulse 1.2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 70% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        .stt-result { margin-top: 15px; min-height: 60px; font-weight: 900; border: 2px dashed var(--pure-black); padding: 10px; border-radius: 10px; background: rgba(255,255,255,0.1); }
-        .scroll-hint { position: absolute; bottom: 30px; background: var(--pure-black); color: white; padding: 8px 15px; border-radius: 20px; font-weight: 900; cursor: pointer; text-transform: uppercase; }
+        .stt-result { margin-top: 20px; min-height: 80px; font-weight: 900; border: 2px dashed var(--pure-black); padding: 15px; background: rgba(255,255,255,0.2); border-radius: 12px; font-size: 1.1rem; text-align: left; }
+        .scroll-hint { position: absolute; bottom: 30px; font-weight: 900; background: var(--pure-black); color: white; padding: 10px 20px; border-radius: 30px; text-transform: uppercase; cursor: pointer; }
     </style>
 </head>
 <body>
-    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}"); }</script>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+      }
+    </script>
 
     <div class="section" id="tts-section">
         <div class="glass-panel">
             <h2>Synthesis</h2>
             <form action="/convert" method="POST">
-                <textarea id="main-textarea" name="text" placeholder="WRITE YOUR TEXT..." required></textarea>
-                <select name="voice">
+                <textarea id="main-textarea" name="text" placeholder="WRITE YOUR MESSAGE..." required></textarea>
+                <select name="voice" id="voice-select">
                     {% for key, data in voices.items() %}
                         <option value="{{ key }}">{{ data.name }}</option>
                     {% endfor %}
@@ -44,9 +52,11 @@
                 <button type="submit" class="btn-main">Generate Audio</button>
             </form>
             {% if audio_path %}
-                <div style="margin-top:15px; border-top: 2px solid black; padding-top:10px;">
-                    <p><b>Converted:</b> {{ translated }}</p>
-                    <audio controls autoplay><source src="{{ audio_path }}" type="audio/mpeg"></audio>
+                <div style="margin-top:20px; border-top: 2px solid black; padding-top:15px;">
+                    <p style="font-weight: 800;"><b>Converted:</b> {{ translated }}</p>
+                    <audio controls autoplay style="width:100%">
+                        <source src="{{ audio_path }}" type="audio/mpeg">
+                    </audio>
                 </div>
             {% endif %}
         </div>
@@ -56,44 +66,40 @@
     <div class="section" id="stt-section">
         <div class="glass-panel">
             <h2>Recording</h2>
+            <p style="font-weight: 900;">Set Voice Input Language:</p>
             <select id="mic-lang-select">
                 {% for key, data in voices.items() %}
                     <option value="{{ data.mic_code }}">{{ data.name.split(' (')[0] }}</option>
                 {% endfor %}
             </select>
             <button class="mic-btn" id="mic-toggle">🎤</button>
-            <div class="stt-result" id="output-text">Voice will appear here...</div>
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn-main" style="flex: 1;" onclick="copyText()">COPY</button>
-                <button class="btn-main" style="flex: 1; background: white; color: black;" onclick="transferText()">USE IN TTS</button>
+            <div class="stt-result" id="output-text">Transcription...</div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-main" style="flex: 1;" onclick="copyToClipboard()">COPY</button>
+                <button class="btn-main" style="flex: 1; background: white; color: black;" onclick="transferToTTS()">USE IN TTS</button>
             </div>
         </div>
-        <div class="scroll-hint" style="top:30px; bottom:auto;" onclick="document.getElementById('tts-section').scrollIntoView()">↑ BACK TO TOP</div>
+        <div class="scroll-hint" style="top: 30px; bottom: auto;" onclick="document.getElementById('tts-section').scrollIntoView()">↑ BACK TO TOP</div>
     </div>
 
     <script>
         const micBtn = document.getElementById('mic-toggle');
         const outputDisplay = document.getElementById('output-text');
-        const micLang = document.getElementById('mic-lang-select');
+        const micLangSelect = document.getElementById('mic-lang-select');
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
             micBtn.onclick = () => {
-                recognition.lang = micLang.value;
-                recognition.start();
-                micBtn.classList.add('active');
+                recognition.lang = micLangSelect.value;
+                try { recognition.start(); micBtn.classList.add('active'); } catch (e) { recognition.stop(); }
             };
-            recognition.onresult = (e) => {
-                outputDisplay.innerText = e.results[0][0].transcript;
-                micBtn.classList.remove('active');
-            };
-            recognition.onerror = () => micBtn.classList.remove('active');
+            recognition.onresult = (e) => { outputDisplay.innerText = e.results[0][0].transcript; micBtn.classList.remove('active'); };
             recognition.onend = () => micBtn.classList.remove('active');
         }
 
-        function copyText() { navigator.clipboard.writeText(outputDisplay.innerText); alert("Copied!"); }
-        function transferText() {
+        function copyToClipboard() { navigator.clipboard.writeText(outputDisplay.innerText).then(() => alert("Copied!")); }
+        function transferToTTS() {
             document.getElementById('main-textarea').value = outputDisplay.innerText;
             document.getElementById('tts-section').scrollIntoView();
         }
