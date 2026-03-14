@@ -15,10 +15,12 @@
         }
         .section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .glass-panel { background: var(--glass); backdrop-filter: blur(20px); border: 3px solid var(--black); border-radius: 20px; padding: 30px; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
-        h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; margin-top: 0; letter-spacing: 1px; }
-        textarea { width: 100%; height: 100px; background: rgba(255,255,255,0.1); border: 2px solid var(--black); border-radius: 10px; padding: 12px; font-weight: 700; box-sizing: border-box; font-size: 1rem; }
+        h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; text-transform: uppercase; margin-top: 0; letter-spacing: 1px; }
+        textarea { width: 100%; height: 100px; background: rgba(255,255,255,0.1); border: 2px solid var(--black); border-radius: 10px; padding: 12px; font-weight: 700; box-sizing: border-box; font-size: 1rem; color: #000; transition: all 0.3s; }
+        .flash-text { background: rgba(0,0,0,0.1); border-color: #000; transform: scale(1.02); }
         select, .btn-main { width: 100%; margin: 12px 0; padding: 14px; border: 2px solid var(--black); border-radius: 10px; font-weight: 900; font-family: 'Orbitron'; cursor: pointer; }
-        .btn-main { background: var(--black); color: #fff; text-transform: uppercase; }
+        .btn-main { background: var(--black); color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-main:hover { background: transparent; color: #000; }
         .stt-result { margin-top: 15px; min-height: 70px; border: 2px dashed var(--black); padding: 12px; border-radius: 10px; font-weight: 700; background: rgba(255,255,255,0.1); text-align: left; }
     </style>
 </head>
@@ -27,8 +29,8 @@
     <div class="section" id="top">
         <div class="glass-panel">
             <h2>Synthesis</h2>
-            <form action="/convert#top" method="POST">
-                <textarea id="txt" name="text" placeholder="ENTER TEXT..." required></textarea>
+            <form id="ttsForm" action="/convert#top" method="POST">
+                <textarea id="txtArea" name="text" placeholder="ENTER TEXT..." required></textarea>
                 <select name="voice">
                     {% for k, v in voices.items() %}
                         <option value="{{ k }}">{{ v.name }}</option>
@@ -39,7 +41,7 @@
             {% if audio_path %}
                 <div style="margin-top:15px; border-top: 2px solid black; padding-top:10px;">
                     <p><b>Converted:</b> {{ translated }}</p>
-                    <audio id="player" controls autoplay style="width:100%">
+                    <audio id="audioPlayer" controls autoplay style="width:100%">
                         <source src="{{ audio_path }}" type="audio/mpeg">
                     </audio>
                 </div>
@@ -55,43 +57,61 @@
                     <option value="{{ v.mic_code }}">{{ v.name.split(' (')[0] }}</option>
                 {% endfor %}
             </select>
-            <button class="btn-main" id="mic">🎤 Click to Speak</button>
-            <div class="stt-result" id="out">...</div>
+            <button class="btn-main" id="micBtn">🎤 Click to Speak</button>
+            <div class="stt-result" id="sttOut">...</div>
             <button class="btn-main" onclick="useInTts()" style="background:#fff; color:#000;">Use in Synthesis</button>
         </div>
     </div>
 
     <script>
-        // SMART AUDIO FIX
-        const player = document.getElementById('player');
+        // Automatic retry for Vercel audio stream
+        const player = document.getElementById('audioPlayer');
         if (player) {
-            player.addEventListener('loadedmetadata', function() {
-                if (player.duration === Infinity || player.duration === 0) {
-                    console.log("Audio failed to load properly, retrying...");
-                    setTimeout(() => { player.load(); }, 1000);
-                }
+            player.addEventListener('error', () => {
+                console.log("Stream sync issue, retrying...");
+                setTimeout(() => { player.load(); }, 800);
             });
         }
 
         function useInTts() {
-            document.getElementById('txt').value = document.getElementById('out').innerText;
-            window.scrollTo(0, 0);
+            const sttText = document.getElementById('sttOut').innerText;
+            const targetArea = document.getElementById('txtArea');
+            
+            if (sttText && sttText !== "...") {
+                targetArea.value = sttText;
+                // Visual feedback
+                targetArea.classList.add('flash-text');
+                setTimeout(() => targetArea.classList.remove('flash-text'), 500);
+                
+                // Scroll to Top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                alert("Please record some audio first!");
+            }
         }
 
-        const mic = document.getElementById('mic');
+        const micBtn = document.getElementById('micBtn');
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
-            mic.onclick = () => {
+            micBtn.onclick = () => {
                 recognition.lang = document.getElementById('mic-lang').value;
                 recognition.start();
-                mic.innerText = "Listening...";
+                micBtn.innerText = "Listening...";
+                micBtn.style.background = "#ff3b3b";
             };
             recognition.onresult = (e) => {
-                document.getElementById('out').innerText = e.results[0][0].transcript;
-                mic.innerText = "🎤 Click to Speak";
+                document.getElementById('sttOut').innerText = e.results[0][0].transcript;
+                micBtn.innerText = "🎤 Click to Speak";
+                micBtn.style.background = "#000";
             };
-            recognition.onend = () => mic.innerText = "🎤 Click to Speak";
+            recognition.onend = () => {
+                micBtn.innerText = "🎤 Click to Speak";
+                micBtn.style.background = "#000";
+            };
+        } else {
+            micBtn.innerText = "Mic Not Supported";
         }
     </script>
 </body>
