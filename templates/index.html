@@ -7,40 +7,39 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --black: #000; --glass: rgba(255, 255, 255, 0.25); }
-        body, html { margin: 0; padding: 0; height: 100%; scroll-behavior: smooth; }
+        body, html { margin: 0; padding: 0; min-height: 100%; scroll-behavior: smooth; }
         body {
             background-image: url("{{ url_for('static', filename='images/background.jpeg') }}");
-            background-size: cover; background-attachment: fixed;
+            background-size: cover; background-attachment: fixed; background-position: center;
             color: var(--black); font-family: 'Rajdhani', sans-serif;
         }
         .section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .glass-panel { background: var(--glass); backdrop-filter: blur(25px); border: 3px solid var(--black); border-radius: 24px; padding: 40px; width: 100%; max-width: 480px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
-        h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; margin-top: 0; text-transform: uppercase; }
-        textarea { width: 100%; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid var(--black); border-radius: 12px; padding: 15px; font-weight: 700; box-sizing: border-box; }
-        select, .btn-main { width: 100%; margin: 15px 0; padding: 15px; border: 2px solid var(--black); border-radius: 12px; font-weight: 900; font-family: 'Orbitron'; cursor: pointer; }
+        .glass-panel { background: var(--glass); backdrop-filter: blur(20px); border: 3px solid var(--black); border-radius: 20px; padding: 30px; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
+        h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; margin-top: 0; letter-spacing: 1px; }
+        textarea { width: 100%; height: 100px; background: rgba(255,255,255,0.1); border: 2px solid var(--black); border-radius: 10px; padding: 12px; font-weight: 700; box-sizing: border-box; font-size: 1rem; }
+        select, .btn-main { width: 100%; margin: 12px 0; padding: 14px; border: 2px solid var(--black); border-radius: 10px; font-weight: 900; font-family: 'Orbitron'; cursor: pointer; }
         .btn-main { background: var(--black); color: #fff; text-transform: uppercase; }
-        .btn-main:hover { background: transparent; color: var(--black); }
-        .stt-result { margin-top: 20px; min-height: 80px; border: 2px dashed var(--black); padding: 15px; border-radius: 12px; font-weight: 900; background: rgba(255,255,255,0.2); text-align: left; }
+        .stt-result { margin-top: 15px; min-height: 70px; border: 2px dashed var(--black); padding: 12px; border-radius: 10px; font-weight: 700; background: rgba(255,255,255,0.1); text-align: left; }
     </style>
 </head>
 <body>
 
-    <div class="section" id="tts">
+    <div class="section" id="top">
         <div class="glass-panel">
             <h2>Synthesis</h2>
-            <form action="/convert" method="POST">
-                <textarea id="main-text" name="text" placeholder="WRITE HERE..." required></textarea>
+            <form action="/convert#top" method="POST">
+                <textarea id="txt" name="text" placeholder="ENTER TEXT..." required></textarea>
                 <select name="voice">
-                    {% for key, data in voices.items() %}
-                        <option value="{{ key }}">{{ data.name }}</option>
+                    {% for k, v in voices.items() %}
+                        <option value="{{ k }}">{{ v.name }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit" class="btn-main">Generate Audio</button>
+                <button type="submit" class="btn-main">Generate Voice</button>
             </form>
             {% if audio_path %}
-                <div style="margin-top:20px; border-top: 2px solid black; padding-top:15px;">
+                <div style="margin-top:15px; border-top: 2px solid black; padding-top:10px;">
                     <p><b>Converted:</b> {{ translated }}</p>
-                    <audio id="audioPlayer" controls autoplay style="width:100%">
+                    <audio id="player" controls autoplay style="width:100%">
                         <source src="{{ audio_path }}" type="audio/mpeg">
                     </audio>
                 </div>
@@ -48,48 +47,51 @@
         </div>
     </div>
 
-    <div class="section" id="stt">
+    <div class="section" id="bottom">
         <div class="glass-panel">
             <h2>Recording</h2>
             <select id="mic-lang">
-                {% for key, data in voices.items() %}
-                    <option value="{{ data.mic_code }}">{{ data.name.split(' (')[0] }}</option>
+                {% for k, v in voices.items() %}
+                    <option value="{{ v.mic_code }}">{{ v.name.split(' (')[0] }}</option>
                 {% endfor %}
             </select>
-            <button class="btn-main" id="rec-btn">🎤 START RECORDING</button>
-            <div class="stt-result" id="stt-out">...</div>
-            <button class="btn-main" onclick="toTTS()" style="background:#fff; color:#000;">USE IN SYNTHESIS</button>
+            <button class="btn-main" id="mic">🎤 Click to Speak</button>
+            <div class="stt-result" id="out">...</div>
+            <button class="btn-main" onclick="useInTts()" style="background:#fff; color:#000;">Use in Synthesis</button>
         </div>
     </div>
 
     <script>
-        // Force reload if player stays at 0:00
-        const player = document.getElementById('audioPlayer');
+        // SMART AUDIO FIX
+        const player = document.getElementById('player');
         if (player) {
-            player.addEventListener('error', () => {
-                setTimeout(() => { player.load(); }, 500);
+            player.addEventListener('loadedmetadata', function() {
+                if (player.duration === Infinity || player.duration === 0) {
+                    console.log("Audio failed to load properly, retrying...");
+                    setTimeout(() => { player.load(); }, 1000);
+                }
             });
         }
 
-        function toTTS() {
-            document.getElementById('main-text').value = document.getElementById('stt-out').innerText;
-            window.scrollTo(0,0);
+        function useInTts() {
+            document.getElementById('txt').value = document.getElementById('out').innerText;
+            window.scrollTo(0, 0);
         }
 
-        const recBtn = document.getElementById('rec-btn');
+        const mic = document.getElementById('mic');
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
-            recBtn.onclick = () => {
+            mic.onclick = () => {
                 recognition.lang = document.getElementById('mic-lang').value;
                 recognition.start();
-                recBtn.innerText = "LISTENING...";
+                mic.innerText = "Listening...";
             };
             recognition.onresult = (e) => {
-                document.getElementById('stt-out').innerText = e.results[0][0].transcript;
-                recBtn.innerText = "🎤 START RECORDING";
+                document.getElementById('out').innerText = e.results[0][0].transcript;
+                mic.innerText = "🎤 Click to Speak";
             };
-            recognition.onerror = () => { recBtn.innerText = "🎤 START RECORDING"; };
+            recognition.onend = () => mic.innerText = "🎤 Click to Speak";
         }
     </script>
 </body>
