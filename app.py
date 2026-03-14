@@ -23,7 +23,6 @@ VOICES = {
     "kn-IN-GaganNeural": {"name": "Kannada (Male)", "lang": "kn", "mic_code": "kn-IN"},
     "ml-IN-MidhunNeural": {"name": "Malayalam (Male)", "lang": "ml", "mic_code": "ml-IN"},
     "mr-IN-ManoharNeural": {"name": "Marathi (Male)", "lang": "mr", "mic_code": "mr-IN"},
-    "pa-IN-HardikNeural": {"name": "Punjabi (Male)", "lang": "pa", "mic_code": "pa-IN"},
     "ta-IN-ValluvarNeural": {"name": "Tamil (Male)", "lang": "ta", "mic_code": "ta-IN"},
     "te-IN-MohanNeural": {"name": "Telugu (Male)", "lang": "te", "mic_code": "te-IN"},
     "en-IN-PrabhatNeural": {"name": "Indian English (Male)", "lang": "en", "mic_code": "en-IN"}
@@ -41,21 +40,17 @@ def index():
 def get_audio(filename):
     path = os.path.join(OUTPUT_DIR, filename)
     if os.path.exists(path):
-        # Force the browser to treat this as a fresh stream every time
         response = make_response(send_file(path, mimetype="audio/mpeg"))
-        response.headers["Content-Disposition"] = "inline; filename=voice.mp3"
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
         return response
-    return "Audio not ready, please refresh.", 404
+    return "File not ready", 404
 
 @app.route('/convert', methods=['POST'])
 def convert():
-    # Cleanup old files before new generation
+    # Cleanup files older than 2 minutes
     for f in glob.glob(os.path.join(OUTPUT_DIR, "voice_*.mp3")):
         try:
-            if os.path.getmtime(f) < time.time() - 300: # 5 mins
+            if os.path.getmtime(f) < time.time() - 120:
                 os.remove(f)
         except: pass
 
@@ -63,7 +58,7 @@ def convert():
     voice_key = request.form.get('voice')
     
     if not input_text:
-        return "Input empty", 400
+        return "Please provide text", 400
 
     target_lang = VOICES[voice_key]['lang']
     try:
@@ -71,15 +66,13 @@ def convert():
     except:
         translated = input_text 
 
-    # Generate strictly unique filename
     filename = f"voice_{uuid.uuid4().hex}_{int(time.time())}.mp3"
     filepath = os.path.join(OUTPUT_DIR, filename)
 
     try:
         asyncio.run(generate_speech(translated, voice_key, filepath))
-        
-        # Add cache buster to URL
-        audio_url = f"/get_audio/{filename}?cb={uuid.uuid4().hex}"
+        # Unique URL to force browser refresh
+        audio_url = f"/get_audio/{filename}?v={uuid.uuid4().hex[:8]}"
         
         return render_template('index.html', 
                                audio_path=audio_url, 
@@ -89,4 +82,4 @@ def convert():
         return f"Error: {str(e)}", 500
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
