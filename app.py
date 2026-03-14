@@ -9,7 +9,7 @@ from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
 
-# Environment Check
+# Detect environment
 IS_VERCEL = "VERCEL" in os.environ
 OUTPUT_DIR = "/tmp" if IS_VERCEL else os.path.join('static', 'outputs')
 
@@ -29,18 +29,13 @@ VOICES = {
     "en-IN-PrabhatNeural": {"name": "Indian English (Male)", "lang": "en", "mic_code": "en-IN"}
 }
 
-# --- NEW: AUTO-DELETE FUNCTION ---
-def cleanup_old_files(directory, max_age_seconds=300):
-    """Deletes files older than 5 minutes to keep /tmp clean."""
-    current_time = time.time()
-    for filepath in glob.glob(os.path.join(directory, "voice_*.mp3")):
-        try:
-            file_age = os.path.getmtime(filepath)
-            if (current_time - file_age) > max_age_seconds:
-                os.remove(filepath)
-                print(f"Auto-Deleted: {filepath}")
-        except Exception as e:
-            print(f"Cleanup Error: {e}")
+def cleanup_old_files():
+    """Removes old voice files to prevent /tmp overflow."""
+    now = time.time()
+    for f in glob.glob(os.path.join(OUTPUT_DIR, "voice_*.mp3")):
+        if os.stat(f).st_mtime < now - 600:  # Delete files older than 10 mins
+            try: os.remove(f)
+            except: pass
 
 async def generate_speech(text, voice, output_path):
     communicate = edge_tts.Communicate(text, voice)
@@ -52,21 +47,22 @@ def index():
 
 @app.route('/get_audio/<filename>')
 def get_audio(filename):
-    path_to_file = os.path.join(OUTPUT_DIR, filename)
-    if os.path.exists(path_to_file):
-        return send_file(path_to_file, mimetype="audio/mpeg")
-    return "File not found", 404
+    path = os.path.join(OUTPUT_DIR, filename)
+    if os.path.exists(path):
+        response = send_file(path, mimetype="audio/mpeg")
+        # Prevent caching at the header level
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return response
+    return "Not Found", 404
 
 @app.route('/convert', methods=['POST'])
 def convert():
-    # Run cleanup before generating a new file
-    cleanup_old_files(OUTPUT_DIR)
-
+    cleanup_old_files()
     input_text = request.form.get('text', '').strip()
     voice_key = request.form.get('voice')
     
     if not input_text:
-        return "Empty text", 400
+        return "Input needed", 400
 
     target_lang = VOICES[voice_key]['lang']
     try:
@@ -74,22 +70,18 @@ def convert():
     except:
         translated_text = input_text 
 
-    unique_id = uuid.uuid4().hex
-    filename = f"voice_{unique_id}.mp3"
-    filepath = os.path.join(OUTPUT_DIR, filename)
+    # Unique ID with timestamp ensures a totally fresh URL
+    unique_name = f"voice_{uuid.uuid4().hex}_{int(time.time())}.mp3"
+    filepath = os.path.join(OUTPUT_DIR, unique_name)
 
     try:
         asyncio.run(generate_speech(translated_text, voice_key, filepath))
+        # Add a query param to the URL to double-ensure the browser doesn't cache
+        audio_url = f"/get_audio/{unique_name}?v={int(time.time())}"
         
-        timestamp = int(time.time())
-        audio_url = f"/get_audio/{filename}?t={timestamp}"
-
-        return render_template('index.html', 
-                               audio_path=audio_url, 
-                               voices=VOICES, 
-                               translated=translated_text)
+        return render_template('index.html', audio_path=audio_url, voices=VOICES, translated=translated_text)
     except Exception as e:
-        return f"System Error: {e}", 500
+        return f"Error: {e}", 500
 
 if __name__ == '__main__':
     app.run()
