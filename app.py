@@ -8,15 +8,12 @@ from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
 
-# Vercel Check: Vercel only allows writing to /tmp
+# Check for Vercel environment
 IS_VERCEL = "VERCEL" in os.environ
+OUTPUT_DIR = "/tmp" if IS_VERCEL else os.path.join('static', 'outputs')
 
-if IS_VERCEL:
-    OUTPUT_DIR = "/tmp"
-else:
-    OUTPUT_DIR = os.path.join('static', 'outputs')
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+if not IS_VERCEL and not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
 
 VOICES = {
     "hi-IN-MadhurNeural": {"name": "Hindi (Male)", "lang": "hi", "mic_code": "hi-IN"},
@@ -25,6 +22,7 @@ VOICES = {
     "kn-IN-GaganNeural": {"name": "Kannada (Male)", "lang": "kn", "mic_code": "kn-IN"},
     "ml-IN-MidhunNeural": {"name": "Malayalam (Male)", "lang": "ml", "mic_code": "ml-IN"},
     "mr-IN-ManoharNeural": {"name": "Marathi (Male)", "lang": "mr", "mic_code": "mr-IN"},
+    "pa-IN-HardikNeural": {"name": "Punjabi (Male)", "lang": "pa", "mic_code": "pa-IN"},
     "ta-IN-ValluvarNeural": {"name": "Tamil (Male)", "lang": "ta", "mic_code": "ta-IN"},
     "te-IN-MohanNeural": {"name": "Telugu (Male)", "lang": "te", "mic_code": "te-IN"},
     "en-IN-PrabhatNeural": {"name": "Indian English (Male)", "lang": "en", "mic_code": "en-IN"}
@@ -38,10 +36,10 @@ async def generate_speech(text, voice, output_path):
 def index():
     return render_template('index.html', voices=VOICES)
 
-# MANDATORY FOR VERCEL: This route serves the file from /tmp
 @app.route('/get_audio/<filename>')
 def get_audio(filename):
-    return send_file(os.path.join(OUTPUT_DIR, filename))
+    # This specifically fetches the file from /tmp on Vercel
+    return send_file(os.path.join(OUTPUT_DIR, filename), mimetype="audio/mpeg")
 
 @app.route('/convert', methods=['POST'])
 def convert():
@@ -49,7 +47,7 @@ def convert():
     voice_key = request.form.get('voice')
     
     if not input_text:
-        return "Please enter text.", 400
+        return "Empty input", 400
 
     target_lang = VOICES[voice_key]['lang']
     try:
@@ -57,23 +55,14 @@ def convert():
     except:
         translated_text = input_text 
 
-    # Cleanup (Local only)
-    if not IS_VERCEL:
-        for f in glob.glob(os.path.join(OUTPUT_DIR, "*.mp3")):
-            try: os.remove(f)
-            except: continue
-
     filename = f"voice_{uuid.uuid4().hex}.mp3"
     filepath = os.path.join(OUTPUT_DIR, filename)
 
     try:
         asyncio.run(generate_speech(translated_text, voice_key, filepath))
         
-        # Logic to choose the correct URL path
-        if IS_VERCEL:
-            audio_url = f"/get_audio/{filename}"
-        else:
-            audio_url = f"/static/outputs/{filename}"
+        # This is the URL the browser will call
+        audio_url = f"/get_audio/{filename}" if IS_VERCEL else f"/static/outputs/{filename}"
 
         return render_template('index.html', 
                                audio_path=audio_url, 
@@ -83,4 +72,4 @@ def convert():
         return f"Error: {e}", 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
