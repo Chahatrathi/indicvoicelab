@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Indic Voice Lab </title>
+    
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#000000">
+
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --pure-black: #000000; --glass: rgba(255, 255, 255, 0.25); }
+        
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; scroll-behavior: smooth; }
+        body {
+            background-image: url("{{ url_for('static', filename='images/background.jpeg') }}");
+            background-size: cover; background-attachment: fixed; background-position: center top;
+            color: var(--pure-black); font-family: 'Rajdhani', sans-serif;
+        }
+
+        .section { min-height: 100vh; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; padding: 40px 0; box-sizing: border-box; }
+        
+        .glass-panel { 
+            background: var(--glass); backdrop-filter: blur(25px); 
+            border: 3px solid var(--pure-black); border-radius: 24px; 
+            padding: 40px; width: 90%; max-width: 480px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4); text-align: center; 
+        }
+
+        h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; text-transform: uppercase; margin-top: 0; letter-spacing: 2px; }
+        
+        textarea { 
+            width: 100%; height: 120px; background: rgba(255,255,255,0.15); 
+            border: 2px solid var(--pure-black); border-radius: 12px; 
+            padding: 15px; font-weight: 700; font-size: 1.1rem; 
+            box-sizing: border-box; color: black; resize: none; 
+        }
+
+        select, .btn-main { 
+            width: 100%; margin: 15px 0; padding: 15px; 
+            border: 2px solid var(--pure-black); border-radius: 12px; 
+            font-weight: 900; font-family: 'Orbitron'; cursor: pointer; 
+        }
+
+        .btn-main { background: var(--pure-black); color: white; text-transform: uppercase; letter-spacing: 1.5px; transition: 0.3s; }
+        .btn-main:hover { background: transparent; color: var(--pure-black); }
+
+        .mic-btn { 
+            width: 80px; height: 80px; border-radius: 50%; 
+            border: 3px solid var(--pure-black); background: white; 
+            font-size: 2rem; cursor: pointer; transition: 0.3s; 
+            display: inline-flex; align-items: center; justify-content: center; 
+            margin: 10px 0; 
+        }
+        
+        .mic-btn.active { background: #ff3b3b; color: white; animation: pulse 1.2s infinite; }
+        
+        @keyframes pulse { 
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 
+            70% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(255, 0, 0, 0); } 
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } 
+        }
+
+        .stt-result { 
+            margin-top: 20px; min-height: 80px; font-weight: 900; 
+            border: 2px dashed var(--pure-black); padding: 15px; 
+            background: rgba(255,255,255,0.2); border-radius: 12px; 
+            font-size: 1.1rem; text-align: left; 
+        }
+
+        .scroll-hint { 
+            position: absolute; bottom: 30px; font-weight: 900; 
+            background: var(--pure-black); color: white; padding: 10px 20px; 
+            border-radius: 30px; text-transform: uppercase; cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+      }
+    </script>
+
+    <div class="section" id="tts-section">
+        <div class="glass-panel">
+            <p style="font-weight: 900; font-size: 0.8rem; letter-spacing: 2px;">NEURAL ENGINE</p>
+            <h2>Synthesis</h2>
+            <form action="/convert" method="POST">
+                <textarea id="main-textarea" name="text" placeholder="TYPE OR PASTE YOUR MESSAGE..." required></textarea>
+                <select name="voice" id="voice-select">
+                    {% for key, data in voices.items() %}
+                        <option value="{{ key }}">{{ data.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-main">Generate Audio</button>
+            </form>
+            {% if audio %}
+                <div style="margin-top:20px; border-top: 2px solid black; padding-top:15px;">
+                    <p style="font-weight: 800;"><b>Converted:</b> {{ translated }}</p>
+                    <audio controls autoplay style="width:100%"><source src="{{ audio_path }}" type="audio/mpeg"></audio>
+                </div>
+            {% endif %}
+        </div>
+        <div class="scroll-hint" onclick="document.getElementById('stt-section').scrollIntoView()">↓ GO TO SPEECH TO TEXT</div>
+    </div>
+
+    <div class="section" id="stt-section">
+        <div class="glass-panel">
+            <p style="font-weight: 900; font-size: 0.8rem; letter-spacing: 2px;">VOICE CAPTURE</p>
+            <h2>Recording</h2>
+            
+            <p style="font-weight: 900;">Set Voice Input Language:</p>
+            <select id="mic-lang-select">
+                {% for key, data in voices.items() %}
+                    <option value="{{ data.mic_code }}">{{ data.name.split(' (')[0] }}</option>
+                {% endfor %}
+            </select>
+
+            <button class="mic-btn" id="mic-toggle">🎤</button>
+            <div class="stt-result" id="output-text">Transcription will appear here...</div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-main" style="flex: 1;" onclick="copyToClipboard()">COPY</button>
+                <button class="btn-main" style="flex: 1; background: white; color: black;" onclick="transferToTTS()">USE IN TTS</button>
+            </div>
+        </div>
+        <div class="scroll-hint" style="top: 30px; bottom: auto;" onclick="document.getElementById('tts-section').scrollIntoView()">↑ BACK TO TOP</div>
+    </div>
+
+    <script>
+        const micBtn = document.getElementById('mic-toggle');
+        const outputDisplay = document.getElementById('output-text');
+        const mainTextarea = document.getElementById('main-textarea');
+        const micLangSelect = document.getElementById('mic-lang-select');
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.interimResults = false;
+
+            micBtn.onclick = () => {
+                recognition.lang = micLangSelect.value; // Get lang from Recording section dropdown
+                try {
+                    recognition.start();
+                    micBtn.classList.add('active');
+                } catch (e) {
+                    recognition.stop();
+                }
+            };
+
+            recognition.onresult = (event) => {
+                const result = event.results[0][0].transcript;
+                outputDisplay.innerText = result;
+                micBtn.classList.remove('active');
+            };
+
+            recognition.onerror = () => micBtn.classList.remove('active');
+            recognition.onend = () => micBtn.classList.remove('active');
+        } else {
+            alert("Speech recognition is not supported in this browser.");
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(outputDisplay.innerText).then(() => alert("Text Copied!"));
+        }
+
+        function transferToTTS() {
+            const recordedText = outputDisplay.innerText;
+            if(recordedText && recordedText !== "Transcription will appear here...") {
+                mainTextarea.value = recordedText;
+                document.getElementById('tts-section').scrollIntoView();
+            }
+        }
+    </script>
+</body>
+</html>
