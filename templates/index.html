@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> Indic Voice Lab </title>
+    <title>Indic Voice Lab | Universal App</title>
     
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -103,7 +103,7 @@
             {% if audio %}
                 <div style="margin-top:20px; border-top: 2px solid black; padding-top:15px;">
                     <p style="font-weight: 800;"><b>Converted:</b> {{ translated }}</p>
-                    <audio controls autoplay style="width:100%"><source src="{{ audio_path }}" type="audio/mpeg"></audio>
+                    <audio controls autoplay style="width:100%"><source src="{{ url_for('static', filename='outputs/' + audio) }}" type="audio/mpeg"></audio>
                 </div>
             {% endif %}
         </div>
